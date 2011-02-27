@@ -1,0 +1,133 @@
+<?xml version="1.0"?>
+<workflow>
+	<property file="./generator.properties"/>
+	
+    <!-- Setup UML2 support -->
+    <!-- initializes resourcemaps, urimaps, etc. -->
+    <bean class="org.eclipse.xtend.typesystem.uml2.Setup" standardUML2Setup="true"/> 
+    
+    <!-- defines metamodels -->
+	<bean id="uml2" class="org.eclipse.xtend.typesystem.uml2.UML2MetaModel"/>
+	<bean id="micProfile" class="org.eclipse.xtend.typesystem.uml2.profile.ProfileMetaModel">
+         <profile value="${modelPath}/${micProfileFile}"/>
+    </bean>
+	<bean id="ruleProfile" class="org.eclipse.xtend.typesystem.uml2.profile.ProfileMetaModel">
+         <profile value="${modelPath}/${ruleProfileFile}"/>
+    </bean>
+	<bean id="noProfile" class="org.eclipse.xtend.typesystem.uml2.profile.ProfileMetaModel">
+         <profile value="${metaModelPath}/${noProfileFile}"/>
+    </bean>
+    
+    <!-- Clean targets -->
+    <component class="org.eclipse.emf.mwe.utils.DirectoryCleaner">
+    	<directory value="${genPath}/"/>
+    </component>
+    <component class="org.eclipse.emf.mwe.utils.DirectoryCleaner">
+    	<directory value="${srcPathDom}/"/>
+    </component>
+    <component class="org.eclipse.emf.mwe.utils.DirectoryCleaner">
+    	<directory value="${srcPathSrv}/"/>
+    </component>
+    <component class="org.eclipse.emf.mwe.utils.DirectoryCleaner">
+    	<directory value="${srcPathFix}/"/>
+    </component>
+    
+    <!-- Reads the UML models and stores it into right slots -->
+	<component class="org.eclipse.xtend.typesystem.emf.XmiReader">
+		<modelFile value="${modelPath}/${pimFile}"/>
+		<outputSlot value="${pimSlot}"/>
+	</component>
+
+    <!-- Reads the merge models and stores it into right slots -->
+	<component class="org.eclipse.xtend.typesystem.xsd.XMLReader">
+		<uri value="${transformationPath}/${mmFile}"/>
+		<modelSlot value="${mmSlot}"/>
+		<metaModel id="noMergeModel" class="org.eclipse.xtend.typesystem.xsd.XSDMetaModel">
+        	<schemaFile value="${metaModelPath}/${noMergeModel}"/>
+        </metaModel>
+	</component>
+
+	<!-- Transform the model -->	
+	<component class="org.eclipse.xtend.XtendComponent">
+		<metaModel idRef="uml2"/>
+		<metaModel idRef="micProfile"/>
+		<metaModel idRef="noProfile"/>
+		<metaModel idRef="ruleProfile"/>
+		<metaModel idRef="noMergeModel"/>
+		<invoke value="src::transformation::mic2no::transform(${pimSlot}, ${mmSlot})"/>
+	 	<outputSlot value="${psmSlot}"/>
+	</component>
+
+	<!-- Store the transformed model -->
+	<component class="org.eclipse.xtend.typesystem.uml2.UML2Writer">
+		<outPath value="${genPath}/${psmFile}"/>
+		<inputSlot value="${psmSlot}"/>
+		<useUML1x value="true"/>
+	</component>
+	
+	<!-- Validate the model -->	
+	<component class="org.eclipse.xtend.check.CheckComponent">
+		<metaModel idRef="uml2"/>
+		<metaModel idRef="noProfile"/>
+		<checkFile value="src::validation::Constraints"/>
+		<!-- check the object in slot 'model' (i.e. the uml::Model instance)
+		   and all its children
+		 -->
+		<emfAllChildrenSlot value="${psmSlot}"/>
+	</component>
+
+	<!-- XPand for NO 4.0.0  -->
+	<component id="generator" class="org.eclipse.xpand2.Generator" skipOnErrors="true">
+		<metaModel idRef="uml2"/>
+		<metaModel idRef="noProfile"/>
+		<metaModel idRef="ruleProfile"/>
+        <!-- Start text/code generation with the following template for the object  -->
+		<expand value="template::NakedObjects::Dom FOR ${psmSlot}"/>
+		<!-- Configure default outlet -->
+   		<outlet path="${srcPathDom}">
+			<!-- Beautify generated Java output -->
+	       <postprocessor class="org.eclipse.xpand2.output.JavaBeautifier"/>
+	    </outlet>
+	    <fileEncoding value="ISO-8859-1"/>
+	</component>
+	<component id="generator" class="org.eclipse.xpand2.Generator" skipOnErrors="true">
+		<metaModel idRef="uml2"/>
+		<metaModel idRef="noProfile"/>
+		<metaModel idRef="ruleProfile"/>
+        <!-- Start text/code generation with the following template for the object  -->
+		<expand value="template::NakedObjects::Srv FOR ${psmSlot}"/>
+		<!-- Configure default outlet -->
+   		<outlet path="${srcPathSrv}">
+			<!-- Beautify generated Java output -->
+	       <postprocessor class="org.eclipse.xpand2.output.JavaBeautifier"/>
+	    </outlet>
+	    <fileEncoding value="ISO-8859-1"/>
+	</component>
+	<component id="generator" class="org.eclipse.xpand2.Generator" skipOnErrors="true">
+		<metaModel idRef="uml2"/>
+		<metaModel idRef="noProfile"/>
+		<metaModel idRef="ruleProfile"/>
+        <!-- Start text/code generation with the following template for the object  -->
+		<expand value="template::NakedObjects::SrvJPA FOR ${psmSlot}"/>
+		<!-- Configure default outlet -->
+   		<outlet path="${srcPathSrvJPA}">
+			<!-- Beautify generated Java output -->
+	       <postprocessor class="org.eclipse.xpand2.output.JavaBeautifier"/>
+	    </outlet>
+	    <fileEncoding value="ISO-8859-1"/>
+	</component>
+	<component id="generator" class="org.eclipse.xpand2.Generator" skipOnErrors="true">
+		<metaModel idRef="uml2"/>
+		<metaModel idRef="noProfile"/>
+		<metaModel idRef="ruleProfile"/>
+        <!-- Start text/code generation with the following template for the object  -->
+		<expand value="template::NakedObjects::Cfg FOR ${psmSlot}"/>
+		<!-- Configure default outlet -->
+   		<outlet path="${srcPathCfg}">
+			<!-- Beautify generated Java output -->
+	       <postprocessor class="org.eclipse.xpand2.output.JavaBeautifier"/>
+	    </outlet>
+	    <fileEncoding value="ISO-8859-1"/>
+	</component>
+
+</workflow>

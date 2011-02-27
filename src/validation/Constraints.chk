@@ -1,0 +1,10 @@
+import uml;
+import NakedObjects;
+
+context Property WARNING "Class " + ((Class)owner).name + ": Attribute named 'id' will be ignored due to internal use by hibernate!" :
+	name.toLowerCase() != 'id';
+
+context nakedId ERROR "Class " + ((Class)owner).name + ": ID-Attribute has to be nummeric!" :
+	"Integer integer Int int Long long".contains(type.name);
+	
+// add more constraints...

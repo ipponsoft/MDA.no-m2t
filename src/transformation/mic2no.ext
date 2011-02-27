@@ -1,0 +1,49 @@
+import uml;
+import NakedObjects;
+import ModelingInColor;
+
+extension org::eclipse::xtend::typesystem::uml2::profile::profiling;
+
+uml::Model transform(uml::Model m, nakedObjectsMergeModel::NoClassListType m2m) :
+	m.applyProfile("src/metamodel/NakedObjects.profile.uml") ->
+	m.allOwnedElements().typeSelect(ModelingInColor::party)
+		.addAll(m.allOwnedElements().typeSelect(ModelingInColor::place))
+		.addAll(m.allOwnedElements().typeSelect(ModelingInColor::thing))
+		.addAll(m.allOwnedElements().typeSelect(ModelingInColor::role))
+		.addAll(m.allOwnedElements().typeSelect(ModelingInColor::description))
+		.addAll(m.allOwnedElements().typeSelect(ModelingInColor::moment_interval))
+			.collect(t | 
+				t.applyStereotype("NakedObjects::nakedObject") ->
+				t.configServiceEntry(m2m) ->
+				t.configId(m2m) ->
+				t.configTitle(m2m)
+				) ->
+	m;
+	
+uml::Class configServiceEntry(uml::Class o, nakedObjectsMergeModel::NoClassListType m2m) :
+	let st = o.getAppliedStereotype("NakedObjects::nakedObject") :
+	o.isAbstract ?
+		o.setValue(st, "isServiceEntry", false) :
+		o.setValue(st, "isServiceEntry", true) ->
+		o.setValue(st, "serviceEntryName", m2m.noClass.selectFirst(e | e.name == o.name).serviceEntryName) ->
+		o.setValue(st, "serviceIcon", m2m.noClass.selectFirst(e | e.name == o.name).serviceIcon) ->
+		o;
+
+uml::Class configId(uml::Class o, nakedObjectsMergeModel::NoClassListType m2m) :
+	let id = m2m.noClass.selectFirst(e | e.name == o.name).idField :
+	let prop = o.selectProperty(id) :
+		null == id || null == prop ?
+			o :
+			prop.applyStereotype("NakedObjects::nakedId") ->
+			o;
+
+uml::Class configTitle(uml::Class o, nakedObjectsMergeModel::NoClassListType m2m) :
+	let st = o.getAppliedStereotype("NakedObjects::nakedObject") :
+	let title = m2m.noClass.selectFirst(e | e.name == o.name).title :
+		null == title ?
+			o :
+			o.setValue(st, "title", title) ->
+			o;
+	
+uml::Property selectProperty(uml::Class o, String name) :
+	o.attribute.selectFirst(e | e.name == name);

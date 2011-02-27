@@ -1,0 +1,551 @@
+«IMPORT uml»
+«IMPORT NakedObjects»
+«IMPORT RuleManagement»
+«EXTENSION template::NakedObjectsHelper»
+
+«REM» ============================================================= «ENDREM»
+
+«DEFINE Dom FOR uml::Model»
+	«EXPAND obj FOREACH allOwnedElements().typeSelect(nakedObject)»
+	«EXPAND enum FOREACH allOwnedElements().typeSelect(Enumeration)»
+«ENDDEFINE»
+
+«DEFINE Srv FOR uml::Model»
+	«EXPAND repObj FOREACH allOwnedElements().typeSelect(nakedObject)»
+«ENDDEFINE»
+
+«DEFINE SrvJPA FOR uml::Model»
+	«EXPAND repObjJPA FOREACH allOwnedElements().typeSelect(nakedObject)»
+«ENDDEFINE»
+
+«DEFINE Cfg FOR uml::Model»
+	«EXPAND cfg FOR allOwnedElements().typeSelect(nakedObject)»
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» Enumeration Class                                           «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE enum FOR Enumeration»
+
+	«FILE asPath("/")+".java"»
+		package «extractPath(".")»;
+		
+		public enum «this.name.className()» {		
+			«FOREACH ownedLiteral AS l SEPARATOR ', '»
+			«l.name.asEnumVal()»
+			«ENDFOREACH» 
+		}
+	«ENDFILE»
+«ENDDEFINE»
+
+
+«REM» ============================================================= «ENDREM»
+«REM» Naked Objects Class                                           «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE obj FOR nakedObject»
+
+	«ownedAttribute.removeAll(ownedAttribute.select(e | e.name.toLowerCase() == "id"))»
+		
+	«FILE asPath("/")+".java"»
+		package «extractPath(".")»;
+		
+		import javax.persistence.*;
+		import org.nakedobjects.applib.annotation.*;
+		
+		@NamedQueries({
+			@NamedQuery(name="findAll«this.name.className()»", query="from «this.name.className()»")
+		})
+		@Entity	
+		@DiscriminatorValue("«this.name.className()»")
+		«IF this.parents().first().name.trim() == null»@Inheritance(strategy=InheritanceType.JOINED)
+		«ENDIF»
+		
+		«IF this.serviceEntryName.length > 0»
+		@Plural("«this.serviceEntryName»")
+		«ENDIF»
+		
+		@FieldOrder(
+		"«FOREACH this.inheritedMember.select(e | ((Property)e).association == null)
+					.addAll(this.ownedAttribute.select(e | ((Property)e).association == null))
+					.addAll(this.inheritedMember.select(e | ((Property)e).association != null))
+					.addAll(this.ownedAttribute.select(e | ((Property)e).association != null)) 
+		  AS a SEPARATOR ','»«a.name.camelCase()»«ENDFOREACH-»"
+		)
+		
+		public class «this.name.className()» extends 
+		«IF this.parents().first().name.trim() == null»org.nakedobjects.applib.AbstractDomainObject
+		«ELSE»«this.parents().first().name»
+		«ENDIF» {
+		
+			public String title() {
+				return 
+				«IF this.title.length > 0-»
+				«this.title»
+				«ELSE-»
+					«IF this.member.typeSelect(nakedName).size > 0-»
+					«FOREACH this.member.typeSelect(nakedName) AS n SEPARATOR ' + ", " + '-»
+					«n.name.asGetter()-»«IF n.type.metaType != uml::PrimitiveType».title()«ENDIF-»
+					«ENDFOREACH-»
+					«ELSE-»super.title()
+					«ENDIF-»
+				«ENDIF-»;
+			}
+
+			public String iconName() {
+				return
+				«IF this.serviceIcon.length > 0-» 
+				"«this.serviceIcon»"
+				«ELSE-»
+				"Default.png"
+				«ENDIF-»;
+			}
+
+			«FOREACH ownedAttribute.typeSelect(nakedId) AS a»
+			«EXPAND idProperty FOR a»
+			«ENDFOREACH»
+								
+			«FOREACH ownedAttribute
+					 .reject(e | e.isMultivalued()) AS a»
+			«EXPAND simpleProperty FOR a»
+			«ENDFOREACH»
+
+			«FOREACH ownedAttribute
+					 .select(e | e.isMultivalued()) AS a»
+			«EXPAND multiValProperty FOR a»
+			«ENDFOREACH»
+			
+			«FOREACH ownedOperation AS o»
+			«EXPAND customOperation FOR o»
+			«ENDFOREACH»
+			
+			«EXPAND delOperation FOR this»
+		}
+	«ENDFILE»
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» ID Property                                                   «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE idProperty FOR nakedId»
+	//**************************************
+	// ID = «name»
+	//**************************************
+
+	private Long id;
+
+	@Id
+	@GeneratedValue(strategy=GenerationType.SEQUENCE)
+	@Optional
+	@Hidden
+	public Long getId() {
+		return this.id;
+	}
+	public void setId(Long anId) {
+		this.id = anId;
+		this.«name.camelCase()» = this.id;
+	}
+		
+	//**************************************
+	// Attribute «name»
+	//**************************************
+
+	private «type.name.mapType()» «name.camelCase()»;
+	
+	@Optional
+	@Disabled
+	public «type.name.mapType()» «name.asGetter()» {
+		return this.«name.camelCase()»;
+	}
+	public void «name.asSetter()»(«type.name.mapType()» «name.asParam()») {
+		this.«name.camelCase()» = «name.asParam()»;
+	}
+
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» Simple Attributes                                             «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE simpleProperty FOR Property»
+
+	«IF !getAppliedStereotypes().collect(e | e.name).contains("nakedId")-»
+	//**************************************
+	// Attribute «name»
+	//**************************************
+
+	private «type.name.mapType()» «name.camelCase()»;
+	
+	@Basic
+	@Optional
+	«IF this.association != null»@ManyToOne«ENDIF»
+	public «type.name.mapType()» «name.asGetter()» {
+		//resolve(«name.camelCase()»);
+		return this.«name.camelCase()»;
+	}
+	«IF visibility == VisibilityKind::public»
+	public void «name.asSetter()»(«type.name.mapType()» «name.asParam()») {
+		if (this.«name.camelCase()» != «name.asParam()») {
+			«IF (this.getOtherEnd() != null) 
+				&& (this.getOtherEnd().isNavigable())»
+				// Assure consistency
+				if ((this.«name.camelCase()» != null)
+					&& («name.asParam()» != null)) {
+				«IF this.getOtherEnd().isMultivalued()-»
+					this.«name.camelCase()».«getOtherEnd().name.asMultiRemover()»(this);
+				«ELSE-»
+					this.«name.camelCase()».«getOtherEnd().name.asSetter()»(null);
+				«ENDIF-»
+				}
+			«ENDIF-» 
+		
+			this.«name.camelCase()» = «name.asParam()»;
+			«IF (this.getOtherEnd() != null) 
+				&& (this.getOtherEnd().isNavigable())»
+				// Assure consistency
+				if («name.asParam()» != null) {
+					«IF this.getOtherEnd().isMultivalued()-»
+						«name.asParam()».«getOtherEnd().name.asMultiSetter()»(this);
+					«ELSE-»
+						«name.asParam()».«getOtherEnd().name.asSetter()»(this);
+					«ENDIF-»
+				}
+			«ENDIF-» 
+			//objectChanged();
+		}
+	}
+	«ENDIF»
+	«ENDIF»
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» Attributes for Associations                                   «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE multiValProperty FOR Property»
+	//**************************************
+	// Multivalued Attribute «name»
+	//**************************************
+
+	private java.util.List<«type.name»> «name.camelCase()» = new java.util.ArrayList<«type.name»>();
+	
+	@OneToMany
+	@Optional
+	public java.util.List<«type.name»> «name.asGetter()» {
+		resolve(«name.camelCase()»);
+		return «name.camelCase()»;
+	}
+	«IF this.visibility == VisibilityKind::public»
+	public void «name.asSetter()»(java.util.List<«type.name»> «name.asParam()») {
+		«name.camelCase()» = «name.asParam()»;
+		//objectChanged();
+	}	
+	public void «name.asMultiSetter()»(«type.name» «name.asParam()») {
+		//resolve(«name.camelCase()»);
+		if (!«name.camelCase()».contains(«name.asParam()»)) {
+			«name.camelCase()».add(«name.asParam()»);
+			«IF (this.getOtherEnd() != null) 
+				&& (this.getOtherEnd().isNavigable())-»
+				// Assure consistency
+				if («name.asParam()» != null) {
+					«IF this.getOtherEnd().isMultivalued()-»
+						«name.asParam()».«getOtherEnd().name.asMultiSetter()»(this);
+					«ELSE-»
+						«name.asParam()».«getOtherEnd().name.asSetter()»(this);
+					«ENDIF-»
+				}
+			«ENDIF-» 
+			//objectChanged();
+		}
+	}
+	public void «name.asMultiRemover()»(«type.name» «name.asParam()») {
+		//resolve(«name.camelCase()»);
+		if («name.camelCase()».contains(«name.asParam()»)) {
+			«name.camelCase()».remove(«name.asParam()»);
+			«IF (this.getOtherEnd() != null) 
+				&& (this.getOtherEnd().isNavigable())-»
+				// Assure consistency
+				if («name.asParam()» != null) {
+					«IF this.getOtherEnd().isMultivalued()-»
+						«name.asParam()».«getOtherEnd().name.asMultiRemover()»(this);
+					«ELSE-»
+						«name.asParam()».«getOtherEnd().name.asSetter()»(null);
+					«ENDIF-»
+				}
+			«ENDIF-» 
+			//objectChanged();
+		}
+	}
+	«ENDIF»
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» Version Attribute                                             «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE versionProperty FOR nakedObject»
+	//**************************************
+	// Version
+	//**************************************
+
+	private Long version;
+
+	@Version
+	@Optional
+	@Hidden
+	public Long getVersion() {
+		return this.version;
+	}
+	public void setVersion(Long version) {
+		this.version = version;
+	}
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» Delete Operation                                              «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE delOperation FOR nakedObject»
+	//**************************************
+	// Operation Loeschen
+	//**************************************
+
+	public void loeschen() {
+		«FOREACH 
+			this.inheritedMember.select(e | ((Property)e).association != null)
+			.addAll(this.ownedAttribute.select(e | ((Property)e).association != null)) AS a -»
+		«IF (((Property)a).getOtherEnd() != null) 
+			&& (((Property)a).getOtherEnd().isNavigable())-»
+			// Assure consistency
+			«IF ((Property)a).isMultivalued()-»
+				java.util.List<«((Property)a).type.name»> tmp = new java.util.ArrayList<«((Property)a).type.name»>();
+				for (int i = 0; i < «a.name.asGetter()».size(); i++) {
+					tmp.add(«a.name.asGetter()».get(i));
+				}
+				for (int i = 0; i < tmp.size(); i++) {
+				«IF ((Property)a).getOtherEnd().isMultivalued()-»
+					tmp.get(i).«((Property)a).getOtherEnd().name.asMultiRemover()»(this);
+				«ELSE-»
+					tmp.get(i).«((Property)a).getOtherEnd().name.asSetter()»(null);
+				«ENDIF-»
+				}
+			«ELSE-»
+				if («a.name.asGetter()» != null) {
+				«IF ((Property)a).getOtherEnd().isMultivalued()-»
+					«a.name.asGetter()».«((Property)a).getOtherEnd().name.asMultiRemover()»(this);
+				«ELSE-»
+					«a.name.asGetter()».«((Property)a).getOtherEnd().name.asSetter()»(null);
+				«ENDIF-»
+				}
+			«ENDIF-»
+		«ENDIF-» 
+  		«ENDFOREACH-»
+		remove(this);
+	}
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» Rule Operations                                             	«ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE customOperation FOR Rule»
+	//**************************************
+	// Business Rule «this.name.camelCase()»
+	//**************************************
+
+	«this.visibility» 
+	«IF this.type.name == null»void «ELSE»de.ipponsoft.services.rules.Result «ENDIF-» 
+	«this.name.camelCase()-»
+	(«FOREACH this.ownedParameter AS p SEPARATOR ', '-»
+	«IF p.name != ""»«p.type.name.mapType()» «p.name.camelCase()»«ENDIF-»
+	«ENDFOREACH-») throws Exception {
+		de.ipponsoft.services.rules.RuleHandler rh = 
+			new de.ipponsoft.services.rules.RuleHandler(
+				"«this.ruleFile»", 
+				de.ipponsoft.services.rules.RuleHandler.TYPE_«this.ruleType.name.toUpperCase()»);
+		«IF this.type.name != null-»
+		return «ENDIF-»rh.fireOn(this);
+	}
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» Custom Operations                                             «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE customOperation FOR Operation»
+	//**************************************
+	// Operation «this.name.camelCase()»
+	//**************************************
+
+	«this.visibility» «IF this.type.name == null»void«ELSE»«this.type.name.mapType()»«ENDIF» 
+	«this.name.camelCase()-»
+	(«FOREACH this.ownedParameter AS p SEPARATOR ', '-»
+	«IF p.name != ""»«p.type.name.mapType()» «p.name.camelCase()»«ENDIF-»
+	«ENDFOREACH-») {
+		«IF this.type.name != null»return null;«ENDIF»
+	}
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» Object Repository                                             «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE repObj FOR nakedObject»
+
+	«ownedAttribute.removeAll(ownedAttribute.select(e | e.name.toLowerCase() == "id"))»
+		
+	«FILE asPath("/")+"Repository.java"»
+		package «extractPath(".")»;
+		
+		import org.nakedobjects.applib.annotation.*;
+
+		«IF this.serviceEntryName.length > 0»
+		@Named("«this.serviceEntryName»")
+		«ELSE»
+		@Named("«this.name.className()»s")
+		«ENDIF-»
+		public class «this.name.className()»Repository 
+			extends org.nakedobjects.applib.AbstractFactoryAndRepository {
+		
+			public String iconName() {
+				return
+				«IF this.serviceIcon.length > 0-» 
+				"«this.serviceIcon»"
+				«ELSE-»
+				"Default.png"
+				«ENDIF-»;
+			}
+							
+		    public «this.name.className()» 
+		    neuesObjekt () {
+		     	return («this.name.className()») newPersistentInstance(«this.name.className()».class);
+		    }
+		     
+		    public java.util.List<«this.name.className()»> 
+		    alleObjekte () {
+		     	return allInstances(«this.name.className()».class);
+		    }
+		
+			«FOREACH this.allParents()
+						.collect(e|e.attribute.reject(e|e.association != null))
+						.add(this.attribute.reject(e|e.association != null)) AS attribList-»
+			«FOREACH attribList AS attrib-»
+		    public java.util.List<«this.name.className()»> 
+		    sucheNach«attrib.name.camelCase().toFirstUpper()-»
+		    (@Named("«attrib.name.camelCase().toFirstUpper()»") «attrib.type.name.mapType()» param) {
+				java.util.Iterator<«this.name.className()»> iter = this.alleObjekte().iterator();
+				java.util.List<«this.name.className()»> ret = new java.util.ArrayList<«this.name.className()»>();
+				while (iter.hasNext()) {
+					«this.name.className()» obj = («this.name.className()»)iter.next();
+					if (
+					«IF attrib.type.name == "String"-»
+					param.equalsIgnoreCase(obj.«attrib.name.asGetter()»)
+					«ELSE-»
+					obj.«attrib.name.asGetter()» == param
+					«ENDIF-»
+					) {
+						ret.add(obj);
+					}
+				}
+				return ret;
+		    }
+
+			«ENDFOREACH»
+			«ENDFOREACH»
+
+		}
+	«ENDFILE»
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» JPA Object Repository                                         «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE repObjJPA FOR nakedObject»
+
+	«ownedAttribute.removeAll(ownedAttribute.select(e | e.name.toLowerCase() == "id"))»
+		
+	«FILE asPath("/")+"RepositoryJPA.java"»
+		package «extractPath(".")»;
+		
+		import org.nakedobjects.applib.annotation.*;
+		import org.nakedobjects.applib.query.QueryDefault;
+
+		«IF this.serviceEntryName.length > 0»
+		@Named("«this.serviceEntryName»")
+		«ELSE»
+		@Named("«this.name.className()»s")
+		«ENDIF-»
+		public class «this.name.className()»RepositoryJPA 
+			extends org.nakedobjects.applib.AbstractFactoryAndRepository {
+		
+			public String iconName() {
+				return
+				«IF this.serviceIcon.length > 0-» 
+				"«this.serviceIcon»"
+				«ELSE-»
+				"Default.png"
+				«ENDIF-»;
+			}
+							
+		    public «this.name.className()» 
+		    neuesObjekt () {
+		     	return («this.name.className()») newTransientInstance(«this.name.className()».class);
+		    }
+		     
+		    public java.util.List<«this.name.className()»> 
+		    alleObjekte () {
+		     	return allInstances(«this.name.className()».class);
+		    }
+
+			«FOREACH this.allParents()
+						.collect(e|e.attribute.reject(e|e.association != null))
+						.add(this.attribute.reject(e|e.association != null)) AS attribList-»
+			«FOREACH attribList AS attrib-»
+		    public java.util.List<«this.name.className()»> 
+		    sucheNach«attrib.name.camelCase().toFirstUpper()-»
+		    (@Named("«attrib.name.camelCase().toFirstUpper()»") «attrib.type.name.mapType()» param) {
+				java.util.Iterator<«this.name.className()»> iter = this.alleObjekte().iterator();
+				java.util.List<«this.name.className()»> ret = new java.util.ArrayList<«this.name.className()»>();
+				while (iter.hasNext()) {
+					«this.name.className()» obj = («this.name.className()»)iter.next();
+					if (
+					«IF attrib.type.name == "String"-»
+					param.equalsIgnoreCase(obj.«attrib.name.asGetter()»)
+					«ELSE-»
+					obj.«attrib.name.asGetter()» == param
+					«ENDIF-»
+					) {
+						ret.add(obj);
+					}
+				}
+				return ret;
+		    }
+
+			«ENDFOREACH»
+			«ENDFOREACH»
+
+		}
+	«ENDFILE»
+«ENDDEFINE»
+
+«REM» ============================================================= «ENDREM»
+«REM» Naked Objects Config Files                                    «ENDREM»
+«REM» ============================================================= «ENDREM»
+
+«DEFINE cfg FOR List»
+	
+	«FILE "nakedObjects.properties"-»
+nakedobjects.persistor=org.starobjects.jpa.runtime.persistence.JpaPersistenceMechanismInstaller
+nakedobjects.reflector=org.starobjects.jpa.metamodel.specloader.JpaJavaReflectorInstaller
+nakedobjects.reflector.class-substitutor=org.nakedobjects.metamodel.specloader.classsubstitutor.ClassSubstitutorIdentity
+nakedobjects.persistor.object-factory=org.nakedobjects.runtime.persistence.objectfactory.ObjectFactoryBasic
+nakedobjects.services=\
+	«FOREACH typeSelect(nakedObject).select(e | e.isServiceEntry) AS s SEPARATOR ', '»«s.asPath(".")»RepositoryJPA«ENDFOREACH»	
+	«ENDFILE»
+
+«ENDDEFINE»
+
+

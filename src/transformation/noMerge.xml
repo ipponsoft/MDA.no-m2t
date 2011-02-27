@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<tns:NOClasses xmlns:tns="http://www.example.org/NakedObjectsMarkup" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.example.org/NakedObjectsMarkup ../metamodel/NakedObjectsMergeModel.xsd ">
+	<tns:NOClass name="Benutzer">
+		<tns:idField>benutzerNummer</tns:idField>
+		<tns:title>name + ", " + vorname</tns:title>
+		<tns:serviceIcon>Person.png</tns:serviceIcon>
+		<tns:serviceEntryName>Benutzer</tns:serviceEntryName>
+	</tns:NOClass>
+	<tns:NOClass name="CD">
+		<tns:idField>medienNummer</tns:idField>
+		<tns:serviceIcon>CD.png</tns:serviceIcon>
+		<tns:serviceEntryName>CDs</tns:serviceEntryName>
+	</tns:NOClass>
+	<tns:NOClass name="Buch">
+		<tns:idField>medienNummer</tns:idField>
+		<tns:serviceIcon>Buch.gif</tns:serviceIcon>
+		<tns:serviceEntryName>Bücher</tns:serviceEntryName>
+	</tns:NOClass>
+	<tns:NOClass name="Medium">
+		<tns:idField>medienNummer</tns:idField>
+		<tns:title>autor + ": " + titel</tns:title>
+		<tns:serviceEntryName>Medien</tns:serviceEntryName>
+	</tns:NOClass>
+	<tns:NOClass name="Ausleihe">
+		<tns:idField>nummer</tns:idField>
+		<tns:title>leser.getName() + " -> " + medium.getAutor() + ": " + medium.getTitel()</tns:title>
+		<tns:serviceIcon>Vorgang.gif</tns:serviceIcon>
+		<tns:serviceEntryName>Vorgänge</tns:serviceEntryName>
+	</tns:NOClass>
+</tns:NOClasses>

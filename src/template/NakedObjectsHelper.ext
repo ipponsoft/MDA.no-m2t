@@ -1,0 +1,65 @@
+import uml;
+
+String extractPath(Classifier cls, String sep) :
+	let nsc = cls.qualifiedName.split("::") :
+	nsc
+		.collect(e | e.toFirstLower())
+		.reject(e | (e == nsc.last().toFirstLower()) || (e == nsc.first().toFirstLower()))
+		.toString(sep);
+	
+String asPath(Classifier cls, String sep) :
+	extractPath(cls, sep) + sep + cls.name.className();
+	
+String replaceSpecialChars(String name) :
+	name
+		.replaceAll("ß","ss")
+  		.replaceAll("ä","ae")
+  		.replaceAll("ö","oe")
+  		.replaceAll("ü","ue")
+  		.replaceAll("Ä","Ae")
+  		.replaceAll("Ö","Oe")
+  		.replaceAll("Ü","Ue");
+
+String removeNonAlphaNumChars(String name) :
+	name
+		.replaceAll("[^A-Za-z0-9_]","_");
+
+String camelCase(String name) :
+	let nc = name.split(" ") :
+	nc.size == 1 
+		? name
+			.replaceSpecialChars()
+	  		.toFirstLower()
+		: nc
+			.collect(c | c.toLowerCase()
+							.replaceSpecialChars()
+					  		.toFirstUpper())
+			.toString("")
+			.toFirstLower();
+		
+String className(String name) :
+	name.contains(" ") ? name.camelCase().toFirstUpper() : name;
+		
+String asSetter(String name) :
+	"set" + name.camelCase().toFirstUpper();
+	
+String asGetter(String name) :
+	"get" + name.camelCase().toFirstUpper() + "()";
+	
+String asMultiSetter(String name) :
+	"addTo" + name.camelCase().toFirstUpper();
+	
+String asMultiRemover(String name) :
+	"removeFrom" + name.camelCase().toFirstUpper();
+	
+String asParam(String name) :
+	"a" + name.camelCase().toFirstUpper();
+	
+String mapType(String type) :
+	"date" == type ? "java.sql.Date" : type; 
+	
+String asEnumVal(String val) :
+	val
+		.replaceSpecialChars()
+		.removeNonAlphaNumChars()
+		.toUpperCase();
